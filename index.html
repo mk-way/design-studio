@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Studio — GitHub Panel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0e0e10;
+    --surface: #17171a;
+    --surface2: #1f1f24;
+    --surface3: #28282f;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f0f2;
+    --muted: #7a7a8a;
+    --dim: #4a4a58;
+    --accent: #7c6af7;
+    --accent2: #5b4de0;
+    --accent-glow: rgba(124,106,247,0.15);
+    --green: #3ecf8e;
+    --green-dim: rgba(62,207,142,0.1);
+    --amber: #f5a623;
+    --amber-dim: rgba(245,166,35,0.1);
+    --red: #f05252;
+    --red-dim: rgba(240,82,82,0.1);
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .topbar-logo {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .topbar-logo span { color: var(--muted); font-weight: 400; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .auth-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--muted);
+    font-family: var(--mono);
+  }
+  .auth-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--red);
+    transition: background 0.3s;
+  }
+  .auth-dot.connected { background: var(--green); }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 52px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 10px;
+  }
+  .repo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    flex: 1;
+    padding: 12px;
+  }
+  .repo-item {
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+  }
+  .repo-item:hover { background: var(--surface2); }
+  .repo-item.active {
+    background: var(--accent-glow);
+    border-color: rgba(124,106,247,0.25);
+  }
+  .repo-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .repo-item-name .badge {
+    font-size: 9px; font-weight: 700;
+    font-family: var(--mono);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 2px 5px; border-radius: 3px;
+  }
+  .badge-pub { background: var(--green-dim); color: var(--green); }
+  .badge-priv { background: var(--amber-dim); color: var(--amber); }
+  .repo-item-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── MAIN PANEL ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* ── PANEL HEADER ── */
+  .panel-header {
+    padding: 20px 28px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .panel-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .panel-title .chip {
+    font-size: 11px; font-weight: 600; font-family: var(--mono);
+    padding: 3px 8px; border-radius: 4px;
+    background: var(--accent-glow); color: var(--accent);
+    border: 1px solid rgba(124,106,247,0.2);
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex; gap: 0;
+  }
+  .tab {
+    padding: 10px 20px;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── CONTENT ── */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px;
+  }
+
+  /* ── FORM ELEMENTS ── */
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .form-row.single { grid-template-columns: 1fr; }
+  .form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field-label {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .field input, .field select, .field textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--accent);
+    background: var(--surface3);
+  }
+  .field select option { background: var(--surface2); }
+  .field textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+  .field-hint { font-size: 11px; color: var(--dim); font-family: var(--mono); }
+
+  /* ── TOGGLE SWITCH ── */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .toggle-label { font-size: 13px; color: var(--text); }
+  .toggle-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .toggle {
+    position: relative; width: 36px; height: 20px;
+    background: var(--surface3); border-radius: 10px;
+    border: 1px solid var(--border2);
+    cursor: pointer; transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle.on { background: var(--accent); border-color: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    background: var(--muted); border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle.on::after { transform: translateX(16px); background: #fff; }
+
+  /* ── BRANCH SELECTOR ── */
+  .branch-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px;
+  }
+  .branch-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    font-size: 12px; font-family: var(--mono);
+    color: var(--text); cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .branch-pill:hover { border-color: var(--accent); }
+  .branch-pill.active { border-color: var(--accent); color: var(--accent); }
+  .branch-icon { font-size: 10px; color: var(--muted); }
+
+  /* ── FILE TREE ── */
+  .file-tree {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .file-tree-header {
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .file-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px;
+    font-size: 12px; font-family: var(--mono);
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .file-item:last-child { border-bottom: none; }
+  .file-item:hover { background: var(--surface2); }
+  .file-item.selected { background: var(--accent-glow); color: var(--accent); }
+  .file-icon { font-size: 13px; }
+  .file-meta { margin-left: auto; font-size: 10px; color: var(--dim); }
+
+  /* ── BUTTONS ── */
+  .btn-row {
+    display: flex; gap: 10px; margin-top: 24px;
+    align-items: center;
+  }
+  .btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-family: var(--sans);
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border2);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border2); background: var(--surface2); }
+  .btn-danger {
+    background: transparent;
+    color: var(--red);
+    border: 1px solid rgba(240,82,82,0.2);
+  }
+  .btn-danger:hover { background: var(--red-dim); }
+  .btn-sm { padding: 6px 12px; font-size: 10px; }
+  .btn-icon { padding: 7px 10px; }
+
+  /* ── STATUS / TOAST ── */
+  .status-bar {
+    padding: 10px 28px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    font-size: 12px; font-family: var(--mono);
+    color: var(--muted);
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+  .status-dot.ok { background: var(--green); }
+  .status-dot.working { background: var(--amber); animation: pulse 1s infinite; }
+  .status-dot.err { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    padding: 12px 18px;
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    font-size: 13px; font-family: var(--mono);
+    color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: transform 0.3s, opacity 0.3s;
+    z-index: 999;
+    max-width: 320px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-icon { font-size: 16px; }
+
+  /* ── SECTION DIVIDER ── */
+  .section-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--dim);
+    margin-bottom: 14px;
+    margin-top: 28px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  /* ── AUTH SCREEN ── */
+  .auth-screen {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    flex: 1; gap: 20px; padding: 40px;
+    text-align: center;
+  }
+  .auth-logo {
+    width: 64px; height: 64px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(124,106,247,0.3);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+  }
+  .auth-title { font-size: 22px; font-weight: 800; }
+  .auth-sub { font-size: 14px; color: var(--muted); max-width: 360px; line-height: 1.6; }
+  .auth-steps {
+    display: flex; flex-direction: column; gap: 10px;
+    text-align: left; width: 100%; max-width: 380px;
+    margin: 8px 0;
+  }
+  .auth-step {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px; color: var(--text);
+  }
+  .auth-step-num {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--accent-glow); color: var(--accent);
+    border: 1px solid rgba(124,106,247,0.3);
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .auth-step-text { line-height: 1.5; }
+  .auth-step-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── COMMIT PREVIEW ── */
+  .commit-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-top: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .commit-preview .key { color: var(--muted); }
+  .commit-preview .val { color: var(--accent); }
+  .commit-preview .val.green { color: var(--green); }
+  .commit-preview .val.amber { color: var(--amber); }
+
+  /* ── NEW BRANCH MODAL ── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-backdrop.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 440px;
+    transform: translateY(16px);
+    transition: transform 0.2s;
+  }
+  .modal-backdrop.open .modal { transform: translateY(0); }
+  .modal-title { font-size: 16px; font-weight: 800; margin-bottom: 20px; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+  /* ── NETLIFY STATUS BADGE ── */
+  .deploy-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 4px;
+    font-size: 11px; font-family: var(--mono); font-weight: 500;
+  }
+  .deploy-badge.ok { background: var(--green-dim); color: var(--green); }
+  .deploy-badge.pending { background: var(--amber-dim); color: var(--amber); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">Design Studio <span>/ GitHub Panel</span></div>
+  <div class="topbar-right">
+    <div class="auth-status">
+      <div class="auth-dot" id="authDot"></div>
+      <span id="authLabel">Não autenticado</span>
+    </div>
+    <button class="btn btn-primary btn-sm" id="authBtn" onclick="handleAuth()">Ligar GitHub</button>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Repositórios</div>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center" onclick="showTab('novo-repo')">+ Novo repositório</button>
+    </div>
+    <div class="repo-list" id="repoList">
+      <div style="font-size:12px;color:var(--dim);padding:12px;font-family:var(--mono)">Autentica para ver repositórios</div>
+    </div>
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="main">
+
+    <!-- AUTH SCREEN (shown when not authenticated) -->
+    <div class="auth-screen" id="authScreen">
+      <div class="auth-logo">⬡</div>
+      <div class="auth-title">Ligar ao GitHub</div>
+      <div class="auth-sub">Faz isto uma vez. Depois podes criar e editar repositórios directamente aqui, sem precisar de saber Git.</div>
+      <div class="auth-steps">
+        <div class="auth-step">
+          <div class="auth-step-num">1</div>
+          <div>
+            <div class="auth-step-text">Clica em "Ligar GitHub"</div>
+            <div class="auth-step-sub">Abre o GitHub para autorizares</div>
+          </div>
+        </div>
+        <div class="auth-step">
+          <div class="auth-step-num">2</div>
+          <div>
+            <div class="auth-step-text">Autoriza a aplicação</div>
+            <div class="auth-step-sub">Permissão para criar e editar repos</div>
+          </div>
+        </div>
+        <div class="auth-step">
+          <div class="auth-step-num">3</div>
+          <div>
+            <div class="auth-step-text">Pronto — só precisas fazer isto uma vez</div>
+            <div class="auth-step-sub">O token fica guardado em sessão</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="simulateAuth()">Ligar GitHub</button>
+    </div>
+
+    <!-- PANEL CONTENT (hidden until authenticated) -->
+    <div id="panelContent" style="display:none;flex-direction:column;height:100%">
+
+      <!-- PANEL HEADER WITH TABS -->
+      <div class="panel-header">
+        <div class="panel-title" id="panelTitle">
+          Selecciona um repositório
+        </div>
+        <div class="tabs">
+          <div class="tab active" onclick="showTab('ficheiros')" id="tab-ficheiros">Ficheiros</div>
+          <div class="tab" onclick="showTab('publicar')" id="tab-publicar">Publicar</div>
+          <div class="tab" onclick="showTab('branches')" id="tab-branches">Branches</div>
+          <div class="tab" onclick="showTab('novo-repo')" id="tab-novo-repo">Novo repo</div>
+        </div>
+      </div>
+
+      <!-- CONTENT AREA -->
+      <div class="content" id="contentArea">
+
+        <!-- TAB: FICHEIROS -->
+        <div id="view-ficheiros">
+          <div class="section-title">Branch activa</div>
+          <div class="branch-row" id="branchRow">
+            <div class="branch-pill active" id="activeBranch">⎇ main</div>
+            <button class="btn btn-ghost btn-sm" onclick="openNewBranchModal()">+ Nova branch</button>
+          </div>
+
+          <div class="section-title">Ficheiros</div>
+          <div class="file-tree" id="fileTree">
+            <div class="file-tree-header">
+              <span id="repoPath">—</span>
+              <button class="btn btn-ghost btn-sm btn-icon" onclick="showTab('publicar')" title="Adicionar ficheiro">+</button>
+            </div>
+            <div id="fileList">
+              <div style="padding:20px;font-size:12px;color:var(--dim);font-family:var(--mono);text-align:center">Selecciona um repositório</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: PUBLICAR -->
+        <div id="view-publicar" style="display:none">
+          <div class="section-title">Ficheiro a publicar</div>
+          <div class="form-row">
+            <div class="field">
+              <label class="field-label">Nome do ficheiro</label>
+              <input type="text" id="fileName" placeholder="ex: landing-cliente.html" oninput="updateCommitPreview()">
+              <div class="field-hint">Inclui a extensão — .html, .svg, .json, etc.</div>
+            </div>
+            <div class="field">
+              <label class="field-label">Pasta (opcional)</label>
+              <input type="text" id="filePath" placeholder="ex: components/buttons" oninput="updateCommitPreview()">
+              <div class="field-hint">Deixa vazio para raiz do repo</div>
+            </div>
+          </div>
+
+          <div class="form-row single">
+            <div class="field">
+              <label class="field-label">Conteúdo</label>
+              <textarea id="fileContent" placeholder="Cola aqui o código gerado pelo Claude..." oninput="updateCommitPreview()"></textarea>
+            </div>
+          </div>
+
+          <div class="section-title">Commit</div>
+          <div class="form-row single">
+            <div class="field">
+              <label class="field-label">Mensagem de commit</label>
+              <input type="text" id="commitMsg" placeholder="ex: Adiciona landing page cliente X" oninput="updateCommitPreview()">
+            </div>
+          </div>
+
+          <div class="commit-preview" id="commitPreview">
+            <div><span class="key">repo    </span><span class="val" id="prev-repo">—</span></div>
+            <div><span class="key">branch  </span><span class="val green" id="prev-branch">main</span></div>
+            <div><span class="key">ficheiro</span><span class="val amber" id="prev-file">—</span></div>
+            <div><span class="key">commit  </span><span class="val" id="prev-msg">—</span></div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="publishFile()">Publicar no GitHub</button>
+            <button class="btn btn-ghost" onclick="showTab('ficheiros')">Cancelar</button>
+            <span style="margin-left:auto;font-size:11px;color:var(--muted);font-family:var(--mono)" id="publishStatus"></span>
+          </div>
+        </div>
+
+        <!-- TAB: BRANCHES -->
+        <div id="view-branches" style="display:none">
+          <div class="section-title">Branches deste repositório</div>
+          <div id="branchList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px"></div>
+          <button class="btn btn-ghost" onclick="openNewBranchModal()">+ Criar nova branch</button>
+        </div>
+
+        <!-- TAB: NOVO REPO -->
+        <div id="view-novo-repo" style="display:none">
+          <div class="section-title">Criar novo repositório</div>
+          <div class="form-row">
+            <div class="field">
+              <label class="field-label">Nome do repositório</label>
+              <input type="text" id="newRepoName" placeholder="ex: landing-cliente-x">
+              <div class="field-hint">Só letras, números e hífens</div>
+            </div>
+            <div class="field">
+              <label class="field-label">Visibilidade</label>
+              <select id="newRepoVisibility">
+                <option value="private">Privado</option>
+                <option value="public">Público</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row single">
+            <div class="field">
+              <label class="field-label">Descrição (opcional)</label>
+              <input type="text" id="newRepoDesc" placeholder="ex: Landing page para campanha de Março">
+            </div>
+          </div>
+          <div class="form-row single">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Inicializar com README</div>
+                <div class="toggle-sub">Recomendado — cria a branch main automaticamente</div>
+              </div>
+              <div class="toggle on" id="readmeToggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+          <div class="form-row single" style="margin-top:12px">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Ligar ao Netlify automaticamente</div>
+                <div class="toggle-sub">Deploy automático a cada commit</div>
+              </div>
+              <div class="toggle on" id="netlifyToggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="createRepo()">Criar repositório</button>
+            <button class="btn btn-ghost" onclick="showTab('ficheiros')">Cancelar</button>
+          </div>
+        </div>
+
+      </div><!-- /content -->
+
+      <!-- STATUS BAR -->
+      <div class="status-bar">
+        <div class="status-dot ok" id="statusDot"></div>
+        <span id="statusMsg">Pronto</span>
+        <span style="margin-left:auto" id="deployBadgeWrap"></span>
+      </div>
+
+    </div><!-- /panelContent -->
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- MODAL: NOVA BRANCH -->
+<div class="modal-backdrop" id="branchModal">
+  <div class="modal">
+    <div class="modal-title">Criar nova branch</div>
+    <div class="field" style="margin-bottom:16px">
+      <label class="field-label">Nome da branch</label>
+      <input type="text" id="newBranchName" placeholder="ex: feature/novo-header">
+      <div class="field-hint" style="margin-top:6px">A partir de: <span id="branchFrom" style="color:var(--accent)">main</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="createBranch()">Criar branch</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">✓</span>
+  <span id="toastMsg">Operação concluída</span>
+</div>
+
+<script>
+// ── STATE ──
+const state = {
+  authenticated: false,
+  user: null,
+  token: null,
+  org: 'MK-Way', // substituir pelo nome da organização real
+  repos: [],
+  activeRepo: null,
+  activeBranch: 'main',
+  branches: ['main'],
+  files: []
+};
+
+// ── MOCK DATA (substitui por GitHub API real) ──
+const mockRepos = [
+  { name: 'landing-cliente-abc', private: false, updatedAt: 'há 2h', files: ['index.html','styles.css','README.md'] },
+  { name: 'newsletter-marco', private: true, updatedAt: 'ontem', files: ['template.html','assets/logo.svg'] },
+  { name: 'banner-campanha-verao', private: false, updatedAt: 'há 3 dias', files: ['banner-1200x628.svg','banner-600x314.svg'] },
+];
+const mockBranches = {
+  'landing-cliente-abc': ['main','feature/novo-hero','fix/mobile'],
+  'newsletter-marco': ['main','draft/v2'],
+  'banner-campanha-verao': ['main'],
+};
+
+// ── AUTH ──
+function handleAuth() {
+  // OAuth real — redirige para GitHub
+  const clientId = 'SEU_GITHUB_CLIENT_ID'; // ← substitui pelo Client ID da OAuth App
+  const redirectUri = encodeURIComponent('https://design-studio.mkway.netlify.app/oauth/callback');
+  const scope = encodeURIComponent('repo read:org');
+  window.location.href =
+    `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+}
+
+// Chamado automaticamente quando o callback OAuth regressa com ?code=...
+async function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  if (!code) return;
+
+  setStatus('working', 'A autenticar com GitHub…');
+  try {
+    const res = await fetch('/.netlify/functions/github-oauth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Limpa o ?code= do URL sem recarregar
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+
+    state.authenticated = true;
+    state.user = data.username;
+    state.token = data.access_token;
+
+    document.getElementById('authDot').classList.add('connected');
+    document.getElementById('authLabel').textContent = state.user;
+    document.getElementById('authBtn').textContent = '✓ GitHub';
+    document.getElementById('authBtn').disabled = true;
+    document.getElementById('authBtn').style.opacity = '0.6';
+
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('panelContent').style.display = 'flex';
+
+    await loadReposFromGitHub();
+    parseUrlParams();
+    showToast('✓', 'Bem-vindo, ' + state.user);
+  } catch(e) {
+    setStatus('err', 'Erro de autenticação: ' + e.message);
+    showToast('⚠', e.message);
+  }
+}
+
+function simulateAuth() {
+  // Simulação — em produção usa OAuth real
+  state.authenticated = true;
+  state.user = 'ana.designer';
+  state.token = 'ghp_simulado';
+  state.repos = mockRepos;
+
+  document.getElementById('authDot').classList.add('connected');
+  document.getElementById('authLabel').textContent = state.user;
+  document.getElementById('authBtn').textContent = '✓ GitHub';
+  document.getElementById('authBtn').disabled = true;
+  document.getElementById('authBtn').style.opacity = '0.6';
+
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('panelContent').style.display = 'flex';
+
+  renderRepoList();
+  showToast('✓', 'Ligado ao GitHub como ' + state.user);
+}
+
+// ── REPOS ──
+// ── CARREGAR REPOS REAIS DA GITHUB API ──
+async function loadReposFromGitHub() {
+  setStatus('working', 'A carregar repositórios MK-Way…');
+  try {
+    // Busca repos da organização MK-Way
+    const res = await fetch('https://api.github.com/orgs/MK-Way/repos?per_page=100&sort=updated', {
+      headers: {
+        Authorization: 'token ' + state.token,
+        Accept: 'application/vnd.github+json'
+      }
+    });
+    if (!res.ok) throw new Error('Erro a carregar repos: ' + res.status);
+    const repos = await res.json();
+
+    // Transforma para o formato interno
+    state.repos = repos.map(r => ({
+      name: r.name,
+      full_name: r.full_name,
+      private: r.private,
+      updatedAt: timeAgo(r.pushed_at),
+      description: r.description || '',
+      files: [] // carregados ao seleccionar
+    }));
+
+    // Actualiza mock para compatibilidade
+    mockRepos.length = 0;
+    state.repos.forEach(r => mockRepos.push(r));
+    state.repos.forEach(r => { if (!mockBranches[r.name]) mockBranches[r.name] = ['main']; });
+
+    renderRepoList();
+    setStatus('ok', state.repos.length + ' repositórios carregados');
+  } catch(e) {
+    setStatus('err', e.message);
+    // Fallback para mock data se API falhar
+    renderRepoList();
+  }
+}
+
+async function loadBranchesFromGitHub(repoName) {
+  if (!state.token) return;
+  try {
+    const res = await fetch(`https://api.github.com/repos/MK-Way/${repoName}/branches?per_page=100`, {
+      headers: { Authorization: 'token ' + state.token, Accept: 'application/vnd.github+json' }
+    });
+    if (!res.ok) return;
+    const branches = await res.json();
+    state.branches = branches.map(b => b.name);
+    mockBranches[repoName] = state.branches;
+    renderBranches();
+  } catch(e) { console.warn('branches:', e); }
+}
+
+async function loadFilesFromGitHub(repoName, branch) {
+  if (!state.token) return;
+  setStatus('working', 'A carregar ficheiros…');
+  try {
+    const res = await fetch(`https://api.github.com/repos/MK-Way/${repoName}/git/trees/${branch}?recursive=1`, {
+      headers: { Authorization: 'token ' + state.token, Accept: 'application/vnd.github+json' }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const files = data.tree.filter(f => f.type === 'blob').map(f => f.path);
+    state.activeRepo.files = files;
+    renderFiles();
+    setStatus('ok', files.length + ' ficheiros');
+  } catch(e) { setStatus('err', 'Erro a carregar ficheiros'); }
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(diff / 36e5);
+  if (h < 1) return 'há minutos';
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `há ${d}d`;
+  return `há ${Math.floor(d/7)} sem`;
+}
+
+function renderRepoList() {
+  const list = document.getElementById('repoList');
+  list.innerHTML = mockRepos.map((r, i) => `
+    <div class="repo-item ${i===0?'active':''}" onclick="selectRepo(${i})">
+      <div class="repo-item-name">
+        ${r.name}
+        <span class="badge ${r.private?'badge-priv':'badge-pub'}">${r.private?'privado':'público'}</span>
+      </div>
+      <div class="repo-item-meta">${r.updatedAt}</div>
+    </div>
+  `).join('');
+  selectRepo(0);
+}
+
+function selectRepo(i) {
+  state.activeRepo = mockRepos[i];
+  state.activeBranch = 'main';
+  // Carrega branches e ficheiros reais da GitHub API
+  loadBranchesFromGitHub(state.activeRepo.name).then(() => {
+    loadFilesFromGitHub(state.activeRepo.name, state.activeBranch);
+  });
+  state.branches = mockBranches[state.activeRepo.name] || ['main'];
+
+  document.querySelectorAll('.repo-item').forEach((el,idx) => {
+    el.classList.toggle('active', idx === i);
+  });
+
+  document.getElementById('panelTitle').innerHTML =
+    `${state.activeRepo.name} <span class="chip">${state.org}</span>`;
+  document.getElementById('repoPath').textContent =
+    `${state.org} / ${state.activeRepo.name}`;
+  document.getElementById('prev-repo').textContent =
+    `${state.org}/${state.activeRepo.name}`;
+
+  renderFiles();
+  renderBranches();
+  showTab('ficheiros');
+  setStatus('ok', 'Repositório: ' + state.activeRepo.name);
+}
+
+function renderFiles() {
+  if (!state.activeRepo) return;
+  const list = document.getElementById('fileList');
+  list.innerHTML = state.activeRepo.files.map(f => `
+    <div class="file-item" onclick="selectFile('${f}')">
+      <span class="file-icon">${f.endsWith('/')? '📁' : getFileIcon(f)}</span>
+      <span>${f}</span>
+      <span class="file-meta">main</span>
+    </div>
+  `).join('');
+}
+
+function getFileIcon(name) {
+  if (name.endsWith('.html')) return '⬜';
+  if (name.endsWith('.svg')) return '◈';
+  if (name.endsWith('.css')) return '◧';
+  if (name.endsWith('.json')) return '{ }';
+  if (name.endsWith('.md')) return '¶';
+  return '·';
+}
+
+function selectFile(name) {
+  document.querySelectorAll('.file-item').forEach(el => {
+    el.classList.toggle('selected', el.querySelector('span:nth-child(2)').textContent === name);
+  });
+  document.getElementById('fileName').value = name;
+  showTab('publicar');
+  updateCommitPreview();
+}
+
+// ── BRANCHES ──
+function renderBranches() {
+  const activeBranchEl = document.getElementById('activeBranch');
+  activeBranchEl.textContent = '⎇ ' + state.activeBranch;
+
+  const branchRow = document.getElementById('branchRow');
+  const pills = state.branches.map(b => `
+    <div class="branch-pill ${b===state.activeBranch?'active':''}" onclick="switchBranch('${b}')">⎇ ${b}</div>
+  `).join('');
+  branchRow.innerHTML = pills + `<button class="btn btn-ghost btn-sm" onclick="openNewBranchModal()">+ Nova branch</button>`;
+
+  const branchList = document.getElementById('branchList');
+  branchList.innerHTML = state.branches.map(b => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <span style="font-family:var(--mono);font-size:13px;color:${b==='main'?'var(--green)':'var(--text)'}">⎇ ${b}</span>
+      ${b==='main'?'<span style="font-size:10px;color:var(--muted);font-family:var(--mono)">branch principal</span>':''}
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="switchBranch('${b}')">Activar</button>
+        ${b!=='main'?`<button class="btn btn-danger btn-sm" onclick="deleteBranch('${b}')">Apagar</button>`:''}
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('prev-branch').textContent = state.activeBranch;
+  document.getElementById('branchFrom').textContent = state.activeBranch;
+}
+
+function switchBranch(name) {
+  state.activeBranch = name;
+  renderBranches();
+  setStatus('ok', 'Branch activa: ' + name);
+  showToast('⎇', 'Branch: ' + name);
+}
+
+function deleteBranch(name) {
+  state.branches = state.branches.filter(b => b !== name);
+  if (state.activeBranch === name) state.activeBranch = 'main';
+  renderBranches();
+  showToast('✓', 'Branch apagada: ' + name);
+}
+
+// ── MODAL ──
+function openNewBranchModal() {
+  document.getElementById('branchModal').classList.add('open');
+  document.getElementById('newBranchName').focus();
+}
+function closeModal() {
+  document.getElementById('branchModal').classList.remove('open');
+  document.getElementById('newBranchName').value = '';
+}
+function createBranch() {
+  const name = document.getElementById('newBranchName').value.trim();
+  if (!name) return;
+  if (!state.branches.includes(name)) state.branches.push(name);
+  state.activeBranch = name;
+  renderBranches();
+  closeModal();
+  showToast('⎇', 'Branch criada: ' + name);
+  setStatus('ok', 'Branch criada: ' + name);
+}
+document.getElementById('branchModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ── PUBLISH ──
+function updateCommitPreview() {
+  const file = document.getElementById('fileName').value;
+  const path = document.getElementById('filePath').value;
+  const msg = document.getElementById('commitMsg').value;
+  const fullPath = path ? path.replace(/\/$/, '') + '/' + file : file;
+
+  document.getElementById('prev-repo').textContent =
+    state.activeRepo ? `${state.org}/${state.activeRepo.name}` : '—';
+  document.getElementById('prev-branch').textContent = state.activeBranch;
+  document.getElementById('prev-file').textContent = fullPath || '—';
+  document.getElementById('prev-msg').textContent = msg || '—';
+}
+
+async function publishFile() {
+  const fileName = document.getElementById('fileName').value.trim();
+  const filePath = document.getElementById('filePath').value.trim();
+  const content = document.getElementById('fileContent').value;
+  const msg = document.getElementById('commitMsg').value.trim();
+
+  if (!fileName || !content) {
+    showToast('⚠', 'Preenche o nome do ficheiro e o conteúdo');
+    return;
+  }
+
+  const fullPath = filePath ? filePath.replace(/\/$/, '') + '/' + fileName : fileName;
+  const status = document.getElementById('publishStatus');
+  status.textContent = 'A publicar…';
+  setStatus('working', 'A fazer commit…');
+
+  // ── GITHUB API CALL ──
+  // Em produção, substitui state.token pelo token OAuth real
+  try {
+    const url = `https://api.github.com/repos/${state.org}/${state.activeRepo.name}/contents/${fullPath}`;
+    const body = {
+      message: msg || `Adiciona ${fileName} via Design Studio`,
+      content: btoa(unescape(encodeURIComponent(content))),
+      branch: state.activeBranch
+    };
+
+    // Verifica se ficheiro já existe (para update)
+    let sha;
+    try {
+      const check = await fetch(url + '?ref=' + state.activeBranch, {
+        headers: { Authorization: 'token ' + state.token, Accept: 'application/vnd.github+json' }
+      });
+      if (check.ok) { const d = await check.json(); sha = d.sha; body.sha = sha; }
+    } catch(e) {}
+
+    // Simulação de sucesso (sem token real)
+    // const res = await fetch(url, { method:'PUT', headers:{...}, body: JSON.stringify(body) });
+
+    // Simula delay e sucesso
+    await new Promise(r => setTimeout(r, 1200));
+
+    // Adiciona ficheiro à lista local
+    if (!state.activeRepo.files.includes(fullPath)) {
+      state.activeRepo.files.push(fullPath);
+      renderFiles();
+    }
+
+    const previewUrl = `https://${state.activeRepo.name}.netlify.app/${fullPath}`;
+    setStatus('ok', 'Publicado — Netlify a fazer deploy…');
+    status.textContent = '';
+    showToast('✓', 'Commit feito → Netlify a fazer deploy');
+
+    // Mostra badge de deploy
+    document.getElementById('deployBadgeWrap').innerHTML =
+      `<div class="deploy-badge pending">⟳ Deploy em curso</div>`;
+    setTimeout(() => {
+      document.getElementById('deployBadgeWrap').innerHTML =
+        `<a href="${previewUrl}" target="_blank" class="deploy-badge ok">✓ Preview disponível</a>`;
+      setStatus('ok', 'Deploy concluído');
+    }, 3000);
+
+  } catch(e) {
+    setStatus('err', 'Erro: ' + e.message);
+    showToast('⚠', 'Erro ao publicar. Verifica a ligação.');
+    status.textContent = '';
+  }
+}
+
+// ── CREATE REPO ──
+async function createRepo() {
+  const name = document.getElementById('newRepoName').value.trim();
+  const desc = document.getElementById('newRepoDesc').value.trim();
+  const priv = document.getElementById('newRepoVisibility').value === 'private';
+  const readme = document.getElementById('readmeToggle').classList.contains('on');
+
+  if (!name) { showToast('⚠', 'Dá um nome ao repositório'); return; }
+
+  setStatus('working', 'A criar repositório…');
+
+  // ── GITHUB API — criar repo na organização MK-Way ──
+  const res = await fetch('https://api.github.com/orgs/MK-Way/repos', {
+    method: 'POST',
+    headers: {
+      Authorization: 'token ' + state.token,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name,
+      description: desc,
+      private: priv,
+      auto_init: readme,
+      gitignore_template: null
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    setStatus('err', err.message);
+    showToast('⚠', err.message);
+    return;
+  }
+
+  const newRepo = { name, private: priv, updatedAt: 'agora', files: readme ? ['README.md'] : [] };
+  mockRepos.unshift(newRepo);
+  mockBranches[name] = ['main'];
+  state.repos = mockRepos;
+
+  renderRepoList();
+  selectRepo(0);
+  setStatus('ok', 'Repositório criado: ' + name);
+  showToast('✓', 'Repositório criado: ' + name);
+}
+
+// ── TABS ──
+function showTab(name) {
+  ['ficheiros','publicar','branches','novo-repo'].forEach(t => {
+    document.getElementById('view-' + t).style.display = t === name ? 'block' : 'none';
+    const tab = document.getElementById('tab-' + t);
+    if (tab) tab.classList.toggle('active', t === name);
+  });
+  if (name === 'publicar') updateCommitPreview();
+}
+
+// ── STATUS ──
+function setStatus(type, msg) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot ' + (type === 'ok' ? 'ok' : type === 'working' ? 'working' : 'err');
+  document.getElementById('statusMsg').textContent = msg;
+}
+
+// ── TOAST ──
+let toastTimer;
+function showToast(icon, msg) {
+  clearTimeout(toastTimer);
+  const t = document.getElementById('toast');
+  document.getElementById('toastIcon').textContent = icon;
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ── INIT: verifica callback OAuth no carregamento ──
+(function init() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('code')) handleOAuthCallback();
+})();
+
+// ── URL PARAMS (para link do Monday) ──
+// Formato esperado: ?repo=org/nome-repo&branch=main&file=caminho/ficheiro.html
+function parseUrlParams() {
+  const p = new URLSearchParams(window.location.search);
+  const repo = p.get('repo');
+  const branch = p.get('branch');
+  const file = p.get('file');
+  if (repo && state.authenticated) {
+    const repoName = repo.split('/')[1];
+    const idx = mockRepos.findIndex(r => r.name === repoName);
+    if (idx >= 0) {
+      selectRepo(idx);
+      if (branch) switchBranch(branch);
+      if (file) {
+        document.getElementById('fileName').value = file;
+        showTab('publicar');
+        updateCommitPreview();
+      }
+    }
+  }
+}
+</script>
+</body>
+</html>

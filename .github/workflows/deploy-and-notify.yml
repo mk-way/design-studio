@@ -1,0 +1,237 @@
+# ─────────────────────────────────────────────────────────────
+#  GitHub Action: Deploy + Monday.com — MK-Way Design Studio
+#  Caminho: .github/workflows/deploy-and-notify.yml
+#
+#  Lógica Monday: um board por cliente/projeto.
+#  O repo tem de ter um ficheiro .monday.json na raiz com o board ID:
+#    { "board_id": "1234567890", "group_id": "topics" }
+#
+#  Secrets a configurar em cada repo (GitHub → Settings → Secrets):
+#    NETLIFY_AUTH_TOKEN    → Netlify → User settings → Applications
+#    NETLIFY_SITE_ID       → Netlify → Site settings → Site ID
+#    MONDAY_API_KEY        → Monday → Avatar → Developers → API token
+#
+#  O MONDAY_BOARD_ID e MONDAY_GROUP_ID vêm do .monday.json do próprio repo,
+#  por isso não precisas de configurar secrets separados por cliente.
+# ─────────────────────────────────────────────────────────────
+
+name: Deploy & Notificar Monday
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "design/**"
+      - "draft/**"
+
+jobs:
+  # ── JOB 1: DEPLOY NETLIFY ──────────────────────────────────
+  deploy:
+    name: Deploy Netlify
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_url: ${{ steps.deploy.outputs.deploy_url }}
+      site_url:   ${{ steps.deploy.outputs.site_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy para Netlify
+        id: deploy
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: "."
+          production-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "${{ github.actor }} — ${{ github.event.head_commit.message }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID:    ${{ secrets.NETLIFY_SITE_ID }}
+
+  # ── JOB 2: NOTIFICAR MONDAY ────────────────────────────────
+  notify_monday:
+    name: Notificar Monday
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # Lê o .monday.json do repo para saber qual board actualizar
+      - name: Ler configuração Monday do repo
+        id: monday_config
+        run: |
+          if [ -f ".monday.json" ]; then
+            BOARD_ID=$(python3 -c "import json; d=json.load(open('.monday.json')); print(d.get('board_id',''))")
+            GROUP_ID=$(python3 -c "import json; d=json.load(open('.monday.json')); print(d.get('group_id','topics'))")
+            CLIENT=$(python3 -c "import json; d=json.load(open('.monday.json')); print(d.get('client',''))")
+            PROJECT=$(python3 -c "import json; d=json.load(open('.monday.json')); print(d.get('project',''))")
+            echo "board_id=${BOARD_ID}"   >> $GITHUB_OUTPUT
+            echo "group_id=${GROUP_ID}"  >> $GITHUB_OUTPUT
+            echo "client=${CLIENT}"       >> $GITHUB_OUTPUT
+            echo "project=${PROJECT}"     >> $GITHUB_OUTPUT
+            echo "configured=true"        >> $GITHUB_OUTPUT
+          else
+            echo "⚠ .monday.json não encontrado — Monday não será notificado"
+            echo "configured=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Recolher metadados do commit
+        if: steps.monday_config.outputs.configured == 'true'
+        id: meta
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git show --name-only --format="" HEAD | head -20)
+          MAIN_FILE=$(echo "$CHANGED" | grep -E '\.(html|svg|css|js|json)$' | head -1)
+          ITEM_NAME="${{ github.event.repository.name }} / ${GITHUB_REF_NAME}"
+
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED"           >> $GITHUB_OUTPUT
+          echo "EOF"                >> $GITHUB_OUTPUT
+          echo "main_file=${MAIN_FILE}"     >> $GITHUB_OUTPUT
+          echo "item_name=${ITEM_NAME}"     >> $GITHUB_OUTPUT
+          echo "branch=${GITHUB_REF_NAME}"  >> $GITHUB_OUTPUT
+          echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          echo "date=$(date -u '+%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Verificar item existente no Monday
+        if: steps.monday_config.outputs.configured == 'true'
+        id: check_item
+        env:
+          MONDAY_API_KEY: ${{ secrets.MONDAY_API_KEY }}
+          BOARD_ID: ${{ steps.monday_config.outputs.board_id }}
+          ITEM_NAME: ${{ steps.meta.outputs.item_name }}
+        run: |
+          RESPONSE=$(curl -s -X POST https://api.monday.com/v2 \
+            -H "Authorization: ${MONDAY_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "API-Version: 2024-01" \
+            -d "{\"query\": \"query { boards(ids: ${BOARD_ID}) { items_page(limit: 100) { items { id name } } } }\"}")
+
+          EXISTING_ID=$(echo "$RESPONSE" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          items = data.get('data',{}).get('boards',[{}])[0].get('items_page',{}).get('items',[])
+          match = next((i['id'] for i in items if i['name'] == '${ITEM_NAME}'), '')
+          print(match)
+          " 2>/dev/null || echo "")
+
+          echo "existing_id=${EXISTING_ID}" >> $GITHUB_OUTPUT
+
+      # ── CRIAR ITEM NOVO ──
+      - name: Criar item no Monday (novo deploy)
+        if: >
+          steps.monday_config.outputs.configured == 'true' &&
+          steps.check_item.outputs.existing_id == ''
+        env:
+          MONDAY_API_KEY: ${{ secrets.MONDAY_API_KEY }}
+          BOARD_ID:    ${{ steps.monday_config.outputs.board_id }}
+          GROUP_ID:    ${{ steps.monday_config.outputs.group_id }}
+          ITEM_NAME:   ${{ steps.meta.outputs.item_name }}
+          DEPLOY_URL:  ${{ needs.deploy.outputs.deploy_url }}
+          SITE_URL:    ${{ needs.deploy.outputs.site_url }}
+          MAIN_FILE:   ${{ steps.meta.outputs.main_file }}
+          BRANCH:      ${{ steps.meta.outputs.branch }}
+          SHORT_SHA:   ${{ steps.meta.outputs.short_sha }}
+          DATE:        ${{ steps.meta.outputs.date }}
+          DESIGNER:    ${{ github.actor }}
+          REPO:        ${{ github.event.repository.name }}
+          ORG:         MK-Way
+        run: |
+          PREVIEW="${DEPLOY_URL:-$SITE_URL}"
+          # Link de edição — abre o painel Design Studio com o ficheiro pré-carregado
+          EDIT_LINK="https://design-studio.mkway.netlify.app/?repo=MK-Way/${REPO}&branch=${BRANCH}&file=${MAIN_FILE}"
+          COMMIT_LINK="https://github.com/MK-Way/${REPO}/commit/${SHORT_SHA}"
+
+          COLUMN_VALUES=$(python3 -c "
+          import json
+          # ATENÇÃO: substitui os IDs abaixo pelos IDs reais das tuas colunas
+          # Corre a query em docs/monday-setup.md para os obter
+          cols = {
+              'text'     : '${MAIN_FILE}',
+              'text4'    : '${REPO}',
+              'text7'    : '${BRANCH}',
+              'text8'    : '${DESIGNER}',
+              'link'     : {'url': '${PREVIEW}',     'text': 'Ver preview'},
+              'link4'    : {'url': '${EDIT_LINK}',   'text': 'Editar no Claude'},
+              'link7'    : {'url': '${COMMIT_LINK}', 'text': '${SHORT_SHA}'},
+              'status'   : {'label': 'Publicado'},
+              'date4'    : '${DATE}',
+          }
+          print(json.dumps(json.dumps(cols)))
+          ")
+
+          curl -s -X POST https://api.monday.com/v2 \
+            -H "Authorization: ${MONDAY_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "API-Version: 2024-01" \
+            -d "{\"query\": \"mutation { create_item(board_id: ${BOARD_ID}, group_id: \\\"${GROUP_ID}\\\", item_name: \\\"${ITEM_NAME}\\\", column_values: ${COLUMN_VALUES}) { id } }\"}"
+
+          echo "✓ Item criado no board ${BOARD_ID}: ${ITEM_NAME}"
+
+      # ── ACTUALIZAR ITEM EXISTENTE ──
+      - name: Actualizar item no Monday (re-deploy)
+        if: >
+          steps.monday_config.outputs.configured == 'true' &&
+          steps.check_item.outputs.existing_id != ''
+        env:
+          MONDAY_API_KEY: ${{ secrets.MONDAY_API_KEY }}
+          BOARD_ID:    ${{ steps.monday_config.outputs.board_id }}
+          ITEM_ID:     ${{ steps.check_item.outputs.existing_id }}
+          DEPLOY_URL:  ${{ needs.deploy.outputs.deploy_url }}
+          SITE_URL:    ${{ needs.deploy.outputs.site_url }}
+          MAIN_FILE:   ${{ steps.meta.outputs.main_file }}
+          BRANCH:      ${{ steps.meta.outputs.branch }}
+          SHORT_SHA:   ${{ steps.meta.outputs.short_sha }}
+          DATE:        ${{ steps.meta.outputs.date }}
+          DESIGNER:    ${{ github.actor }}
+          REPO:        ${{ github.event.repository.name }}
+        run: |
+          PREVIEW="${DEPLOY_URL:-$SITE_URL}"
+          EDIT_LINK="https://design-studio.mkway.netlify.app/?repo=MK-Way/${REPO}&branch=${BRANCH}&file=${MAIN_FILE}"
+          COMMIT_LINK="https://github.com/MK-Way/${REPO}/commit/${SHORT_SHA}"
+
+          COLUMN_VALUES=$(python3 -c "
+          import json
+          cols = {
+              'link'  : {'url': '${PREVIEW}',     'text': 'Ver preview'},
+              'link4' : {'url': '${EDIT_LINK}',   'text': 'Editar no Claude'},
+              'link7' : {'url': '${COMMIT_LINK}', 'text': '${SHORT_SHA}'},
+              'status': {'label': 'Actualizado'},
+              'date4' : '${DATE}',
+              'text8' : '${DESIGNER}',
+          }
+          print(json.dumps(json.dumps(cols)))
+          ")
+
+          curl -s -X POST https://api.monday.com/v2 \
+            -H "Authorization: ${MONDAY_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "API-Version: 2024-01" \
+            -d "{\"query\": \"mutation { change_multiple_column_values(board_id: ${BOARD_ID}, item_id: ${ITEM_ID}, column_values: ${COLUMN_VALUES}) { id } }\"}"
+
+          echo "✓ Item actualizado: ${ITEM_ID}"
+
+      # ── FALHA DE DEPLOY ──
+      - name: Marcar erro no Monday se deploy falhou
+        if: >
+          steps.monday_config.outputs.configured == 'true' &&
+          needs.deploy.result == 'failure' &&
+          steps.check_item.outputs.existing_id != ''
+        env:
+          MONDAY_API_KEY: ${{ secrets.MONDAY_API_KEY }}
+          BOARD_ID: ${{ steps.monday_config.outputs.board_id }}
+          ITEM_ID:  ${{ steps.check_item.outputs.existing_id }}
+        run: |
+          curl -s -X POST https://api.monday.com/v2 \
+            -H "Authorization: ${MONDAY_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "API-Version: 2024-01" \
+            -d "{\"query\": \"mutation { change_multiple_column_values(board_id: ${BOARD_ID}, item_id: ${ITEM_ID}, column_values: \\\"{\\\\\\\"status\\\\\\\": {\\\\\\\"label\\\\\\\": \\\\\\\"Erro deploy\\\\\\\"}}\\\") { id } }\"}"

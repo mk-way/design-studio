@@ -1,0 +1,18 @@
+[build]
+  functions = "netlify/functions"
+
+# Redirect OAuth callback para o painel
+[[redirects]]
+  from = "/oauth/callback"
+  to   = "/index.html"
+  status = 200
+
+# Rota directa para o painel com parâmetros de edição do Monday
+# Exemplo: /editar?repo=MK-Way/landing-cliente&branch=main&file=index.html
+[[redirects]]
+  from = "/editar"
+  to   = "/index.html"
+  status = 200
+
+[functions]
+  node_bundler = "esbuild"

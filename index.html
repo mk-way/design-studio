@@ -783,7 +783,7 @@ const mockBranches = {
 function handleAuth() {
   // OAuth real — redirige para GitHub
   const clientId = 'Ov23lipshb8DlS2NQftj'; // ← substitui pelo Client ID da OAuth App
-  const redirectUri = encodeURIComponent('https://design-studio.mkway.netlify.app/oauth/callback');
+  const redirectUri = encodeURIComponent('https://design-studio-mkway.netlify.app/oauth/callback');
   const scope = encodeURIComponent('repo read:org');
   window.location.href =
     `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;

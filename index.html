@@ -640,48 +640,80 @@
 
         <!-- TAB: NOVO REPO -->
         <div id="view-novo-repo" style="display:none">
-          <div class="section-title">Criar novo repositório</div>
+          <div class="section-title">Ligar site Netlify ao GitHub</div>
+
+          <!-- Step indicator -->
+          <div style="display:flex;gap:8px;margin-bottom:20px;align-items:center" id="newRepoSteps">
+            <div class="deploy-badge ok" id="step1badge">1 — Site Netlify</div>
+            <div style="font-size:10px;color:var(--dim)">→</div>
+            <div class="deploy-badge pending" id="step2badge">2 — Repo GitHub</div>
+            <div style="font-size:10px;color:var(--dim)">→</div>
+            <div class="deploy-badge pending" id="step3badge">3 — Ligar</div>
+          </div>
+
+          <!-- STEP 1: Netlify site info -->
+          <div id="newRepoStep1">
+            <div class="form-row">
+              <div class="field">
+                <label class="field-label">Nome do site no Netlify</label>
+                <input type="text" id="netlifySlug" placeholder="ex: landing-cliente-abc" oninput="previewRepoName()">
+                <div class="field-hint">O nome que aparece em netlify.app — sem o .netlify.app</div>
+              </div>
+              <div class="field">
+                <label class="field-label">Netlify Site ID</label>
+                <input type="text" id="netlifySiteId" placeholder="ex: a1b2c3d4-e5f6-...">
+                <div class="field-hint">Netlify → Site settings → General → Site ID</div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="field">
+                <label class="field-label">Nome do repositório GitHub</label>
+                <input type="text" id="newRepoName" placeholder="ex: landing-cliente-abc" oninput="updateCommitPreview()">
+                <div class="field-hint" id="repoNameHint">Preenche igual ao site Netlify para manter consistência</div>
+              </div>
+              <div class="field">
+                <label class="field-label">Visibilidade</label>
+                <select id="newRepoVisibility">
+                  <option value="private">Privado</option>
+                  <option value="public">Público</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row single">
+              <div class="field">
+                <label class="field-label">Cliente / Descrição</label>
+                <input type="text" id="newRepoDesc" placeholder="ex: Landing page Cliente ABC — campanha Março">
+              </div>
+            </div>
+          </div>
+
+          <!-- Monday board config -->
+          <div class="section-title" style="margin-top:20px">Monday.com — board do cliente</div>
           <div class="form-row">
             <div class="field">
-              <label class="field-label">Nome do repositório</label>
-              <input type="text" id="newRepoName" placeholder="ex: landing-cliente-x">
-              <div class="field-hint">Só letras, números e hífens</div>
+              <label class="field-label">Board ID do Monday</label>
+              <input type="text" id="mondayBoardId" placeholder="ex: 1234567890">
+              <div class="field-hint">URL do board: monday.com/boards/XXXXXXX</div>
             </div>
             <div class="field">
-              <label class="field-label">Visibilidade</label>
-              <select id="newRepoVisibility">
-                <option value="private">Privado</option>
-                <option value="public">Público</option>
-              </select>
+              <label class="field-label">Group ID</label>
+              <input type="text" id="mondayGroupId" placeholder="ex: topics" value="topics">
+              <div class="field-hint">Grupo dentro do board onde criar items</div>
             </div>
           </div>
-          <div class="form-row single">
-            <div class="field">
-              <label class="field-label">Descrição (opcional)</label>
-              <input type="text" id="newRepoDesc" placeholder="ex: Landing page para campanha de Março">
-            </div>
+
+          <!-- Preview do que vai ser criado -->
+          <div class="commit-preview" id="newRepoPreview" style="margin-top:4px">
+            <div><span class="key">repo     </span><span class="val" id="prev-newrepo">github.com/MK-Way/—</span></div>
+            <div><span class="key">netlify  </span><span class="val green" id="prev-netlify">—.netlify.app</span></div>
+            <div><span class="key">monday   </span><span class="val amber" id="prev-monday">board —</span></div>
+            <div><span class="key">action   </span><span class="val" id="prev-action">cria repo + .monday.json + GitHub Action</span></div>
           </div>
-          <div class="form-row single">
-            <div class="toggle-row">
-              <div>
-                <div class="toggle-label">Inicializar com README</div>
-                <div class="toggle-sub">Recomendado — cria a branch main automaticamente</div>
-              </div>
-              <div class="toggle on" id="readmeToggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-          </div>
-          <div class="form-row single" style="margin-top:12px">
-            <div class="toggle-row">
-              <div>
-                <div class="toggle-label">Ligar ao Netlify automaticamente</div>
-                <div class="toggle-sub">Deploy automático a cada commit</div>
-              </div>
-              <div class="toggle on" id="netlifyToggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-          </div>
+
           <div class="btn-row">
-            <button class="btn btn-primary" onclick="createRepo()">Criar repositório</button>
+            <button class="btn btn-primary" onclick="createRepo()">Criar e ligar tudo</button>
             <button class="btn btn-ghost" onclick="showTab('ficheiros')">Cancelar</button>
+            <span style="margin-left:auto;font-size:11px;color:var(--muted);font-family:var(--mono)" id="createRepoStatus"></span>
           </div>
         </div>
 
@@ -1115,48 +1147,216 @@ async function publishFile() {
 }
 
 // ── CREATE REPO ──
-async function createRepo() {
-  const name = document.getElementById('newRepoName').value.trim();
-  const desc = document.getElementById('newRepoDesc').value.trim();
-  const priv = document.getElementById('newRepoVisibility').value === 'private';
-  const readme = document.getElementById('readmeToggle').classList.contains('on');
-
-  if (!name) { showToast('⚠', 'Dá um nome ao repositório'); return; }
-
-  setStatus('working', 'A criar repositório…');
-
-  // ── GITHUB API — criar repo na organização MK-Way ──
-  const res = await fetch('https://api.github.com/orgs/MK-Way/repos', {
-    method: 'POST',
-    headers: {
-      Authorization: 'token ' + state.token,
-      Accept: 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      name,
-      description: desc,
-      private: priv,
-      auto_init: readme,
-      gitignore_template: null
-    })
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    setStatus('err', err.message);
-    showToast('⚠', err.message);
-    return;
+function previewRepoName() {
+  const slug = document.getElementById('netlifySlug').value.trim();
+  if (slug && !document.getElementById('newRepoName').value) {
+    document.getElementById('newRepoName').value = slug;
   }
+  document.getElementById('prev-netlify').textContent = (slug || '—') + '.netlify.app';
+  updateNewRepoPreview();
+}
 
-  const newRepo = { name, private: priv, updatedAt: 'agora', files: readme ? ['README.md'] : [] };
-  mockRepos.unshift(newRepo);
-  mockBranches[name] = ['main'];
-  state.repos = mockRepos;
+function updateNewRepoPreview() {
+  const name = document.getElementById('newRepoName').value.trim();
+  const boardId = document.getElementById('mondayBoardId').value.trim();
+  document.getElementById('prev-newrepo').textContent = 'github.com/MK-Way/' + (name || '—');
+  document.getElementById('prev-monday').textContent = 'board ' + (boardId || '—');
+}
 
-  renderRepoList();
-  selectRepo(0);
-  setStatus('ok', 'Repositório criado: ' + name);
-  showToast('✓', 'Repositório criado: ' + name);
+async function createRepo() {
+  const name        = document.getElementById('newRepoName').value.trim();
+  const desc        = document.getElementById('newRepoDesc').value.trim();
+  const priv        = document.getElementById('newRepoVisibility').value === 'private';
+  const netlifySlug = document.getElementById('netlifySlug').value.trim();
+  const netlifySiteId = document.getElementById('netlifySiteId').value.trim();
+  const boardId     = document.getElementById('mondayBoardId').value.trim();
+  const groupId     = document.getElementById('mondayGroupId').value.trim() || 'topics';
+  const statusEl    = document.getElementById('createRepoStatus');
+
+  if (!name)        { showToast('⚠', 'Dá um nome ao repositório'); return; }
+  if (!netlifySlug) { showToast('⚠', 'Indica o nome do site Netlify'); return; }
+  if (!boardId)     { showToast('⚠', 'Indica o Board ID do Monday'); return; }
+
+  const headers = {
+    Authorization: 'token ' + state.token,
+    Accept: 'application/vnd.github+json',
+    'Content-Type': 'application/json'
+  };
+
+  const step = (n, msg) => {
+    setStatus('working', msg);
+    statusEl.textContent = msg;
+    ['step1badge','step2badge','step3badge'].forEach((id, i) => {
+      document.getElementById(id).className = 'deploy-badge ' + (i < n ? 'ok' : i === n ? 'pending' : 'pending');
+    });
+  };
+
+  try {
+    // ── PASSO 1: Criar repo na MK-Way ──
+    step(0, 'A criar repositório no GitHub…');
+    const repoRes = await fetch('https://api.github.com/orgs/MK-Way/repos', {
+      method: 'POST', headers,
+      body: JSON.stringify({ name, description: desc, private: priv, auto_init: true })
+    });
+    if (!repoRes.ok) {
+      const e = await repoRes.json();
+      // Se já existe, continua — não é erro
+      if (!e.message?.includes('already exists')) {
+        throw new Error(e.message);
+      }
+      showToast('·', 'Repo já existe — a continuar…');
+    }
+
+    // Pequena pausa para o GitHub criar a branch main
+    await new Promise(r => setTimeout(r, 1500));
+
+    // ── PASSO 2: Commit do .monday.json ──
+    step(1, 'A adicionar configuração Monday…');
+    const mondayJson = JSON.stringify({
+      board_id: boardId,
+      group_id: groupId,
+      client: desc || name,
+      project: name,
+      netlify_site: netlifySlug
+    }, null, 2);
+
+    await fetch(`https://api.github.com/repos/MK-Way/${name}/contents/.monday.json`, {
+      method: 'PUT', headers,
+      body: JSON.stringify({
+        message: 'Configura integração Monday.com',
+        content: btoa(mondayJson),
+        branch: 'main'
+      })
+    });
+
+    // ── PASSO 3: Commit do GitHub Action ──
+    step(1, 'A adicionar GitHub Action…');
+    const actionContent = `name: Deploy & Notificar Monday
+on:
+  push:
+    branches: [main, "feature/**", "design/**", "draft/**"]
+jobs:
+  deploy:
+    name: Deploy Netlify
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_url: \${{ steps.deploy.outputs.deploy_url }}
+      site_url: \${{ steps.deploy.outputs.site_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy para Netlify
+        id: deploy
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: "."
+          production-branch: main
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "\${{ github.actor }} — \${{ github.event.head_commit.message }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: \${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: \${{ secrets.NETLIFY_SITE_ID }}
+  notify_monday:
+    name: Notificar Monday
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - name: Ler config Monday
+        id: cfg
+        run: |
+          BOARD_ID=\$(python3 -c "import json; d=json.load(open('.monday.json')); print(d.get('board_id',''))")
+          GROUP_ID=\$(python3 -c "import json; d=json.load(open('.monday.json')); print(d.get('group_id','topics'))")
+          echo "board_id=\${BOARD_ID}" >> \$GITHUB_OUTPUT
+          echo "group_id=\${GROUP_ID}" >> \$GITHUB_OUTPUT
+      - name: Notificar Monday
+        env:
+          MONDAY_API_KEY: \${{ secrets.MONDAY_API_KEY }}
+          DEPLOY_URL: \${{ needs.deploy.outputs.deploy_url }}
+          SITE_URL: \${{ needs.deploy.outputs.site_url }}
+        run: |
+          PREVIEW="\${DEPLOY_URL:-\$SITE_URL}"
+          EDIT_LINK="https://design-studio-mkway.netlify.app/?repo=MK-Way/\${{ github.event.repository.name }}&branch=\${GITHUB_REF_NAME}&file="
+          COLUMN_VALUES=\$(python3 -c "
+          import json
+          cols = {
+            'text8': '\${{ github.actor }}',
+            'text4': '\${{ github.event.repository.name }}',
+            'text7': '\${GITHUB_REF_NAME}',
+            'link':  {'url': '\${PREVIEW}', 'text': 'Ver preview'},
+            'link4': {'url': '\${EDIT_LINK}', 'text': 'Editar no Claude'},
+            'status': {'label': 'Publicado'},
+            'date4': '\$(date -u +%Y-%m-%d)',
+          }
+          print(json.dumps(json.dumps(cols)))
+          ")
+          ITEM_NAME="\${{ github.event.repository.name }} / \${GITHUB_REF_NAME}"
+          curl -s -X POST https://api.monday.com/v2 \\
+            -H "Authorization: \${MONDAY_API_KEY}" \\
+            -H "Content-Type: application/json" \\
+            -H "API-Version: 2024-01" \\
+            -d "{\\"query\\": \\"mutation { create_item(board_id: \${{ steps.cfg.outputs.board_id }}, group_id: \\\\\\"\${{ steps.cfg.outputs.group_id }}\\\\\\", item_name: \\\\\\"\${ITEM_NAME}\\\\\\", column_values: \${COLUMN_VALUES}) { id } }\\"}"
+`;
+
+    await fetch(`https://api.github.com/repos/MK-Way/${name}/contents/.github/workflows/deploy-and-notify.yml`, {
+      method: 'PUT', headers,
+      body: JSON.stringify({
+        message: 'Adiciona GitHub Action deploy + Monday',
+        content: btoa(unescape(encodeURIComponent(actionContent))),
+        branch: 'main'
+      })
+    });
+
+    // ── PASSO 4: Ligar Netlify ao repo (via Netlify API) ──
+    step(2, 'A ligar Netlify ao repositório…');
+    if (netlifySiteId) {
+      const netlifyRes = await fetch(`https://api.netlify.com/api/v1/sites/${netlifySiteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (state.netlifyToken || '') },
+        body: JSON.stringify({
+          repo: {
+            provider: 'github',
+            repo: `MK-Way/${name}`,
+            branch: 'main',
+            deploy_key_id: null
+          }
+        })
+      });
+      // Nota: requer Netlify token — se falhar, mostra instrução manual
+      if (!netlifyRes.ok) {
+        showToast('·', 'Netlify: liga manualmente em Site settings → Build & Deploy');
+      }
+    }
+
+    // ── SUCESSO ──
+    ['step1badge','step2badge','step3badge'].forEach(id => {
+      document.getElementById(id).className = 'deploy-badge ok';
+    });
+
+    const newRepo = { name, private: priv, updatedAt: 'agora', files: ['.monday.json', 'README.md'] };
+    mockRepos.unshift(newRepo);
+    mockBranches[name] = ['main'];
+    state.repos = mockRepos;
+    renderRepoList();
+    selectRepo(0);
+
+    setStatus('ok', 'Tudo criado e ligado: ' + name);
+    statusEl.textContent = '';
+    showToast('✓', name + ' criado, Action e Monday configurados');
+
+    // Instrução para secrets (não automatizável sem Netlify token)
+    setTimeout(() => {
+      showToast('→', 'Último passo: adiciona os secrets no repo GitHub (ver guia)');
+    }, 3500);
+
+  } catch(e) {
+    setStatus('err', e.message);
+    statusEl.textContent = '';
+    showToast('⚠', e.message);
+  }
 }
 
 // ── TABS ──

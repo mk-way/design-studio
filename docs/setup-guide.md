@@ -65,7 +65,7 @@ design-studio/
 |-----------------------|-----------------------------------------------|
 | `GITHUB_CLIENT_ID`    | Client ID da OAuth App                        |
 | `GITHUB_CLIENT_SECRET`| Client Secret da OAuth App                   |
-| `ALLOWED_ORIGIN`      | `https://design-studio.mkway.netlify.app`     |
+| `ALLOWED_ORIGIN`      | `https://design-studio-mkway.netlify.app`     |
 
 4. **Site settings → General → Site name**: muda para `design-studio-mkway`
    (ou configura domínio próprio se quiseres `studio.mkway.pt`)
